@@ -1,0 +1,27 @@
+# Go
+bin/
+obj/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go modules
+vendor/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Build outputs
+blog-api
+*.log
+
+# Uploads & runtime files
+uploads/
+.env
+.env.local
+.DS_Store
+.vscode/
+.idea/
