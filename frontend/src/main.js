@@ -15,4 +15,19 @@ axios.interceptors.request.use(config => {
   return config
 })
 
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response && error.response.status === 401) {
+      const errorMsg = error.response.data.error
+      if (errorMsg === 'token_expired' || errorMsg === 'Invalid or expired token') {
+        alert('登录已过期，请重新登录')
+        localStorage.clear()
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 createApp(App).use(router).mount('#app')

@@ -31,9 +31,19 @@
             <div class="form-text">用户名暂不支持修改</div>
           </div>
           
-          <div class="mb-4">
+          <div class="mb-3">
             <label class="form-label text-muted small fw-bold">电子邮箱</label>
             <input type="email" v-model="email" class="form-control" required placeholder="请输入邮箱">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-bold">博客名称</label>
+            <input type="text" v-model="blogName" class="form-control" placeholder="给你的博客起个好听的名字">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label text-muted small fw-bold">个人简介</label>
+            <textarea v-model="bio" class="form-control" rows="3" placeholder="介绍一下你自己吧..."></textarea>
           </div>
 
           <div class="d-grid">
@@ -54,6 +64,8 @@ import axios from 'axios'
 
 const user = ref(null)
 const email = ref('')
+const blogName = ref('')
+const bio = ref('')
 const tempAvatar = ref('')
 const saving = ref(false)
 const uploading = ref(false)
@@ -68,6 +80,8 @@ const fetchUser = async () => {
     if (res.data.code === 200) {
       user.value = res.data.data
       email.value = res.data.data.email
+      blogName.value = res.data.data.blog_name || ''
+      bio.value = res.data.data.bio || ''
       tempAvatar.value = res.data.data.avatar
     }
   } catch (err) {
@@ -81,7 +95,9 @@ const updateProfile = async () => {
     const token = localStorage.getItem('token')
     const res = await axios.put('/api/v1/user/profile', {
       email: email.value,
-      avatar: tempAvatar.value
+      avatar: tempAvatar.value,
+      blog_name: blogName.value,
+      bio: bio.value
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })

@@ -5,6 +5,7 @@ import axios from 'axios'
 
 const router = useRouter()
 const username = ref('')
+const blogName = ref('')
 const userId = ref('')
 const avatar = ref('')
 const isLoggedIn = ref(false)
@@ -25,6 +26,7 @@ const fetchUserProfile = async () => {
       if (res.data.code === 200) {
         avatar.value = res.data.data.avatar
         username.value = res.data.data.username
+        blogName.value = res.data.data.blog_name
         localStorage.setItem('username', username.value)
       }
     } catch (e) {
@@ -33,6 +35,7 @@ const fetchUserProfile = async () => {
   } else {
     isLoggedIn.value = false
     avatar.value = ''
+    blogName.value = ''
   }
 }
 
@@ -54,6 +57,13 @@ const logout = () => {
   userId.value = ''
   router.push('/login')
 }
+
+const navSearchKeyword = ref('')
+const handleNavSearch = () => {
+  if (!navSearchKeyword.value.trim()) return
+  router.push({ path: '/search', query: { q: navSearchKeyword.value } })
+  navSearchKeyword.value = ''
+}
 </script>
 
 <template>
@@ -62,7 +72,7 @@ const logout = () => {
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
       <div class="container">
         <router-link class="navbar-brand fw-bold text-primary" to="/">
-          <i class="bi bi-journal-text me-2"></i>Simple Blog
+          <i class="bi bi-journal-text me-2"></i>{{ blogName || 'Simple Blog' }}
         </router-link>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
           <span class="navbar-toggler-icon"></span>
@@ -79,6 +89,16 @@ const logout = () => {
               <router-link class="nav-link" to="/admin">后台管理</router-link>
             </li>
           </ul>
+          
+          <!-- 导航栏搜索框 -->
+          <div class="d-none d-lg-flex me-3">
+            <div class="input-group input-group-sm bg-light rounded-pill px-2 border">
+              <span class="input-group-text bg-transparent border-0"><i class="bi bi-search text-muted"></i></span>
+              <input type="text" class="form-control bg-transparent border-0 shadow-none" 
+                placeholder="搜索..." v-model="navSearchKeyword" @keyup.enter="handleNavSearch">
+            </div>
+          </div>
+
           <div class="d-flex align-items-center">
             <template v-if="isLoggedIn">
               <router-link to="/settings" class="navbar-text me-3 text-decoration-none hover-primary d-flex align-items-center py-0">

@@ -60,6 +60,8 @@ func GetPostList(c *gin.Context) {
 	tagName := c.Query("tag")
 	userID, _ := strconv.Atoi(c.Query("user_id"))
 	status := c.DefaultQuery("status", "published")
+	orderBy := c.DefaultQuery("order_by", "created_at")
+	keyword := c.Query("keyword")
 
 	// 如果是管理员或者查询自己的文章，可以查看所有状态
 	currentUserID, _ := c.Get("user_id")
@@ -68,7 +70,7 @@ func GetPostList(c *gin.Context) {
 		status = "" // 不过滤状态
 	}
 
-	posts, total, err := postService.GetPostList(page, pageSize, tagName, uint(userID), status)
+	posts, total, err := postService.GetPostList(page, pageSize, tagName, uint(userID), status, orderBy, keyword)
 	if err != nil {
 		common.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -84,6 +86,17 @@ func GetPostList(c *gin.Context) {
 	})
 }
 
+// GetHotPosts 获取热门文章
+func GetHotPosts(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
+	posts, err := postService.GetHotPosts(limit)
+	if err != nil {
+		common.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	common.Success(c, posts)
+}
+
 // GetUserPosts 获取指定用户的文章列表
 func GetUserPosts(c *gin.Context) {
 	userIDStr := c.Param("id")
@@ -97,7 +110,7 @@ func GetUserPosts(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
 	// 个人主页只显示已发布的文章
-	posts, _, err := postService.GetPostList(page, pageSize, "", uint(userID), "published")
+	posts, _, err := postService.GetPostList(page, pageSize, "", uint(userID), "published", "created_at", "")
 	if err != nil {
 		common.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -223,16 +236,92 @@ func GetPostLikeStatus(c *gin.Context) {
 	postIDStr := c.Param("id")
 	postID, _ := strconv.Atoi(postIDStr)
 
-	count, _ := postService.GetPostLikeCount(uint(postID))
+	likeCount, _ := postService.GetPostLikeCount(uint(postID))
+	favoriteCount, _ := postService.GetPostFavoriteCount(uint(postID))
 
 	isLiked := false
-	// 如果用户登录了，检查是否点赞
+	isFavorited := false
+	// 如果用户登录了，检查是否点赞和收藏
 	if userID, exists := c.Get("user_id"); exists {
 		isLiked, _ = postService.IsPostLiked(userID.(uint), uint(postID))
+		isFavorited, _ = postService.IsPostFavorited(userID.(uint), uint(postID))
 	}
 
 	common.Success(c, gin.H{
-		"count":    count,
-		"is_liked": isLiked,
+		"count":          likeCount,
+		"is_liked":       isLiked,
+		"favorite_count": favoriteCount,
+		"is_favorited":   isFavorited,
 	})
+}
+
+// ToggleFavorite 处理收藏/取消收藏
+func ToggleFavorite(c *gin.Context) {
+	postIDStr := c.Param("id")
+	postID, _ := strconv.Atoi(postIDStr)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		common.Error(c, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	isFavorited, _ := postService.IsPostFavorited(userID.(uint), uint(postID))
+
+	var err error
+	if isFavorited {
+		err = postService.UnfavoritePost(userID.(uint), uint(postID))
+	} else {
+		err = postService.FavoritePost(userID.(uint), uint(postID))
+	}
+
+	if err != nil {
+		common.Error(c, http.StatusInternalServerError, "Operation failed")
+		return
+	}
+
+	common.Success(c, !isFavorited)
+}
+
+// GetFavoritePosts 获取某用户的收藏列表
+func GetFavoritePosts(c *gin.Context) {
+	userIDStr := c.Param("id")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		common.Error(c, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	posts, err := postService.GetFavoritePosts(uint(userID))
+	if err != nil {
+		common.Error(c, http.StatusInternalServerError, "Failed to fetch favorite posts")
+		return
+	}
+	common.Success(c, posts)
+}
+
+// ToggleTop 切换个人置顶状态
+func ToggleTop(c *gin.Context) {
+	id := c.Param("id")
+	userID, _ := c.Get("user_id")
+	userRole, _ := c.Get("user_role")
+
+	if err := postService.ToggleTop(id, userID.(uint), userRole.(string)); err != nil {
+		common.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	common.Success(c, nil)
+}
+
+// ToggleSystemTop 切换全站置顶状态（仅管理员）
+func ToggleSystemTop(c *gin.Context) {
+	id := c.Param("id")
+	userRole, _ := c.Get("user_role")
+
+	if err := postService.ToggleSystemTop(id, userRole.(string)); err != nil {
+		common.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	common.Success(c, nil)
 }

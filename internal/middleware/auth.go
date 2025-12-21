@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"simple-blog/internal/config"
 	"simple-blog/internal/database"
@@ -15,6 +16,7 @@ func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
+			fmt.Println("JWTAuth: Missing Authorization header")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
 			c.Abort()
 			return
@@ -22,6 +24,7 @@ func JWTAuth() gin.HandlerFunc {
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
+			fmt.Printf("JWTAuth: Invalid header format: %s\n", authHeader)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header format must be Bearer {token}"})
 			c.Abort()
 			return
@@ -34,7 +37,13 @@ func JWTAuth() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			fmt.Printf("JWTAuth: Token error: %v\n", err)
+			// 区分过期和其他错误
+			msg := "Invalid or expired token"
+			if err != nil && strings.Contains(err.Error(), "expired") {
+				msg = "token_expired"
+			}
+			c.JSON(http.StatusUnauthorized, gin.H{"error": msg})
 			c.Abort()
 			return
 		}
@@ -52,10 +61,13 @@ func JWTAuth() gin.HandlerFunc {
 					c.Set("user_role", user.Role)
 					c.Set("role", user.Role) // Alias for compatibility
 				}
+				c.Next()
+				return
 			}
 		}
 
-		c.Next()
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+		c.Abort()
 	}
 }
 

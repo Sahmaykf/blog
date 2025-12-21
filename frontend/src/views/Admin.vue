@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+import { MdEditor } from 'md-editor-v3'
+import 'md-editor-v3/lib/style.css'
 
 const activeTab = ref('posts') // 'posts', 'comments', 'notifications'
 const posts = ref([])
@@ -221,6 +223,28 @@ const deletePost = async (id) => {
   }
 }
 
+const toggleTop = async (post) => {
+  try {
+    const res = await axios.post(`/api/v1/posts/${post.ID}/top`)
+    if (res.data.code === 200) {
+      post.is_top = !post.is_top
+    }
+  } catch (error) {
+    alert('操作失败: ' + (error.response?.data?.msg || '未知错误'))
+  }
+}
+
+const toggleSystemTop = async (post) => {
+  try {
+    const res = await axios.post(`/api/v1/posts/${post.ID}/system-top`)
+    if (res.data.code === 200) {
+      post.is_system_top = !post.is_system_top
+    }
+  } catch (error) {
+    alert('操作失败: ' + (error.response?.data?.msg || '未知错误'))
+  }
+}
+
 const deleteComment = async (id) => {
   if (!confirm('确定要删除这条评论吗？')) return
   try {
@@ -246,6 +270,40 @@ const switchTab = (tab) => {
   if (tab === 'comments') fetchComments()
   if (tab === 'notifications') fetchNotifications()
 }
+
+const onUploadImg = async (files, callback) => {
+  try {
+    const res = await Promise.all(
+      files.map((file) => {
+        return new Promise((rev, rej) => {
+          const form = new FormData();
+          form.append('image', file);
+
+          const token = localStorage.getItem('token');
+          axios
+            .post('/api/v1/upload/image', form, {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            })
+            .then((res) => {
+              if (res.data.code === 200) {
+                rev(res.data.data.url);
+              } else {
+                rej(res.data.msg || '上传失败');
+              }
+            })
+            .catch((error) => rej(error.response?.data?.msg || error.message || '网络错误'));
+        });
+      })
+    );
+
+    callback(res);
+  } catch (error) {
+    alert('图片上传失败: ' + error);
+    console.error('Upload error:', error);
+  }
+};
 </script>
 
 <template>
@@ -308,7 +366,7 @@ const switchTab = (tab) => {
           </div>
           <div class="mb-4">
             <label class="form-label text-muted small">内容</label>
-            <textarea class="form-control bg-light border-0" rows="12" v-model="editForm.content" required placeholder="请输入文章内容..."></textarea>
+            <MdEditor v-model="editForm.content" @onUploadImg="onUploadImg" placeholder="请输入文章内容..." style="height: 500px;" />
           </div>
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-dark rounded-pill px-4">保存</button>
@@ -337,7 +395,11 @@ const switchTab = (tab) => {
               <tbody>
                 <tr v-for="post in posts" :key="post.ID">
                   <td class="ps-4">
-                    <div class="fw-bold text-dark">{{ post.title }}</div>
+                    <div class="d-flex align-items-center">
+                      <span v-if="post.is_system_top" class="badge bg-danger me-2" style="font-size: 0.65rem;">全站置顶</span>
+                      <span v-if="post.is_top" class="badge bg-primary me-2" style="font-size: 0.65rem;">个人置顶</span>
+                      <div class="fw-bold text-dark">{{ post.title }}</div>
+                    </div>
                     <div class="text-muted small">ID: #{{ post.ID }}</div>
                   </td>
                   <td>
@@ -351,6 +413,18 @@ const switchTab = (tab) => {
                   <td class="text-muted small">{{ formatDate(post.CreatedAt) }}</td>
                   <td class="pe-4 text-end">
                     <div v-if="canManage(post)">
+                      <button v-if="isAdmin" class="btn btn-sm btn-link text-decoration-none me-2" 
+                        :class="post.is_system_top ? 'text-danger fw-bold' : 'text-muted'"
+                        @click="toggleSystemTop(post)">
+                        <i class="bi" :class="post.is_system_top ? 'bi-pin-fill' : 'bi-pin'"></i>
+                        {{ post.is_system_top ? '取消全站置顶' : '全站置顶' }}
+                      </button>
+                      <button class="btn btn-sm btn-link text-decoration-none me-2" 
+                        :class="post.is_top ? 'text-primary fw-bold' : 'text-muted'"
+                        @click="toggleTop(post)">
+                        <i class="bi" :class="post.is_top ? 'bi-pin-angle-fill' : 'bi-pin-angle'"></i>
+                        {{ post.is_top ? '个人置顶' : '置顶' }}
+                      </button>
                       <button class="btn btn-sm btn-link text-decoration-none me-2 text-dark" @click="togglePostStatus(post)">
                         {{ post.status === 'published' ? '隐藏' : '发布' }}
                       </button>

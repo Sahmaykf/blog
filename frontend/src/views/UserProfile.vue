@@ -15,7 +15,8 @@
               </div>
             </div>
             <h2 class="card-title fw-bold mb-1">{{ user.username }}</h2>
-            <p class="text-muted mb-4">加入时间: {{ formatDate(user.created_at) }}</p>
+            <p v-if="user.bio" class="text-secondary mb-3 px-4 mx-auto" style="max-width: 500px;">{{ user.bio }}</p>
+            <p class="text-muted mb-4 small">加入时间: {{ formatDate(user.created_at) }}</p>
             
             <!-- Stats Row -->
             <div class="d-flex justify-content-center gap-5 mb-4">
@@ -65,7 +66,12 @@
               </li>
               <li class="nav-item">
                 <a class="nav-link" :class="{ active: activeTab === 'likes' }" @click.prevent="activeTab = 'likes'" href="#">
-                  <i class="bi bi-heart me-1"></i> 赞过的文章
+                  <i class="bi bi-heart me-1"></i> 赞过的
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" :class="{ active: activeTab === 'favorites' }" @click.prevent="activeTab = 'favorites'" href="#">
+                  <i class="bi bi-star me-1"></i> 收藏的
                 </a>
               </li>
             </ul>
@@ -83,16 +89,21 @@
                   v-for="post in posts" 
                   :key="post.ID"
                   :to="'/post/' + post.ID"
-                  class="list-group-item list-group-item-action p-4 border-bottom"
+                  class="list-group-item list-group-item-action p-4 border-bottom position-relative"
                 >
-                  <div class="d-flex justify-content-between align-items-start mb-2">
+                  <!-- 置顶标识 -->
+                  <div v-if="post.is_top" class="position-absolute top-0 start-0 bg-primary text-white px-3 py-1 rounded-bottom-end small shadow-sm" style="z-index: 1; border-top-left-radius: 0;">
+                    <i class="bi bi-pin-angle-fill me-1"></i>置顶
+                  </div>
+                  
+                  <div class="d-flex justify-content-between align-items-start mb-2" :class="{'mt-3': post.is_top}">
                     <h5 class="mb-1 fw-bold text-break">{{ post.title }}</h5>
                     <small class="text-muted text-nowrap ms-2">{{ formatDate(post.CreatedAt) }}</small>
                   </div>
-                  <p class="mb-1 text-muted text-truncate">{{ post.content }}</p>
+                  <p class="mb-1 text-muted">{{ truncateContent(post.content) }}</p>
                   <div class="mt-2 d-flex gap-3 text-muted small">
-                    <span><i class="bi bi-chat-dots me-1"></i>{{ post.comments?.length || 0 }} 评论</span>
-                    <!-- If you have like count in post list, add it here -->
+                    <span><i class="bi bi-chat-dots me-1"></i>{{ post.comment_count || 0 }} 评论</span>
+                    <span><i class="bi bi-heart me-1"></i>{{ post.like_count || 0 }} 赞</span>
                   </div>
                 </router-link>
               </div>
@@ -117,7 +128,42 @@
                   </div>
                   <div class="d-flex align-items-center mt-2">
                     <div class="d-flex align-items-center me-3">
-                      <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2" style="width: 24px; height: 24px; font-size: 12px;">
+                      <div v-if="post.user?.avatar" class="rounded-circle overflow-hidden me-2" style="width: 24px; height: 24px;">
+                        <img :src="post.user.avatar" class="w-100 h-100 object-fit-cover">
+                      </div>
+                      <div v-else class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2" style="width: 24px; height: 24px; font-size: 12px;">
+                        {{ post.user?.username?.charAt(0).toUpperCase() || '?' }}
+                      </div>
+                      <small class="text-muted">{{ post.user?.username || 'Unknown' }}</small>
+                    </div>
+                  </div>
+                </router-link>
+              </div>
+            </div>
+
+            <!-- Favorite Posts List -->
+            <div v-if="activeTab === 'favorites'">
+              <div v-if="favoritePosts.length === 0" class="text-center py-5 text-muted">
+                <i class="bi bi-star fs-1 d-block mb-2"></i>
+                暂无收藏的文章
+              </div>
+              <div v-else class="list-group list-group-flush">
+                <router-link 
+                  v-for="post in favoritePosts" 
+                  :key="post.ID"
+                  :to="'/post/' + post.ID"
+                  class="list-group-item list-group-item-action p-4 border-bottom"
+                >
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h5 class="mb-1 fw-bold text-break">{{ post.title }}</h5>
+                    <small class="text-muted text-nowrap ms-2">{{ formatDate(post.CreatedAt) }}</small>
+                  </div>
+                  <div class="d-flex align-items-center mt-2">
+                    <div class="d-flex align-items-center me-3">
+                      <div v-if="post.user?.avatar" class="rounded-circle overflow-hidden me-2" style="width: 24px; height: 24px;">
+                        <img :src="post.user.avatar" class="w-100 h-100 object-fit-cover">
+                      </div>
+                      <div v-else class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2" style="width: 24px; height: 24px; font-size: 12px;">
                         {{ post.user?.username?.charAt(0).toUpperCase() || '?' }}
                       </div>
                       <small class="text-muted">{{ post.user?.username || 'Unknown' }}</small>
@@ -148,6 +194,7 @@ const router = useRouter()
 const user = ref(null)
 const posts = ref([])
 const likedPosts = ref([])
+const favoritePosts = ref([])
 const isFollowing = ref(false)
 const followersCount = ref(0)
 const followingCount = ref(0)
@@ -175,6 +222,20 @@ const formatDate = (dateStr) => {
     month: 'long',
     day: 'numeric'
   })
+}
+
+const truncateContent = (content) => {
+  if (!content) return ''
+  // 移除 Markdown 图片: ![alt](url)
+  let text = content.replace(/!\[.*?\]\(.*?\)/g, '')
+  // 移除 Markdown 链接: [text](url) -> text
+  text = text.replace(/\[(.*?)\]\(.*?\)/g, '$1')
+  // 移除标题符号 #
+  text = text.replace(/#+\s/g, '')
+  // 移除粗体/斜体
+  text = text.replace(/[*_]{1,3}/g, '')
+  
+  return text.length > 100 ? text.substring(0, 100) + '...' : text
 }
 
 const goToNetwork = (type) => {
@@ -209,6 +270,12 @@ const fetchUserData = async () => {
     const likedRes = await axios.get(`/api/v1/users/${userId}/liked-posts`)
     if (likedRes.data.code === 200) {
       likedPosts.value = likedRes.data.data
+    }
+
+    // Fetch favorite posts
+    const favoriteRes = await axios.get(`/api/v1/users/${userId}/favorite-posts`)
+    if (favoriteRes.data.code === 200) {
+      favoritePosts.value = favoriteRes.data.data
     }
 
   } catch (error) {

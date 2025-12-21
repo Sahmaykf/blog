@@ -152,8 +152,10 @@ func GetUserProfile(c *gin.Context) {
 
 func UpdateProfile(c *gin.Context) {
 	var input struct {
-		Email  string `json:"email" binding:"required,email"`
-		Avatar string `json:"avatar"`
+		Email    string `json:"email" binding:"required,email"`
+		Avatar   string `json:"avatar"`
+		BlogName string `json:"blog_name"`
+		Bio      string `json:"bio"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -162,7 +164,7 @@ func UpdateProfile(c *gin.Context) {
 	}
 
 	userID, _ := c.Get("user_id")
-	if err := userService.UpdateProfile(userID.(uint), input.Email, input.Avatar); err != nil {
+	if err := userService.UpdateProfile(userID.(uint), input.Email, input.Avatar, input.BlogName, input.Bio); err != nil {
 		common.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}

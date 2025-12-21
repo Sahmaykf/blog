@@ -147,6 +147,8 @@ func (s *UserService) GetUserProfile(targetUserID uint, currentUserID uint) (map
 		"username":        user.Username,
 		"email":           user.Email,
 		"avatar":          user.Avatar,
+		"blog_name":       user.BlogName,
+		"bio":             user.Bio,
 		"role":            user.Role,
 		"created_at":      user.CreatedAt,
 		"post_count":      postCount,
@@ -156,9 +158,11 @@ func (s *UserService) GetUserProfile(targetUserID uint, currentUserID uint) (map
 	}, nil
 }
 
-func (s *UserService) UpdateProfile(userID uint, email string, avatar string) error {
+func (s *UserService) UpdateProfile(userID uint, email, avatar, blogName, bio string) error {
 	updates := map[string]interface{}{
-		"email": email,
+		"email":     email,
+		"blog_name": blogName,
+		"bio":       bio,
 	}
 	if avatar != "" {
 		updates["avatar"] = avatar
@@ -168,4 +172,19 @@ func (s *UserService) UpdateProfile(userID uint, email string, avatar string) er
 
 func (s *UserService) UpdateAvatar(userID uint, avatarPath string) error {
 	return database.DB.Model(&model.User{}).Where("id = ?", userID).Update("avatar", avatarPath).Error
+}
+
+func (s *UserService) SearchUsers(keyword string, limit int) ([]model.User, error) {
+	var users []model.User
+	err := database.DB.Where("username LIKE ? OR blog_name LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
+		Limit(limit).
+		Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	// 清除敏感信息
+	for i := range users {
+		users[i].Password = ""
+	}
+	return users, nil
 }

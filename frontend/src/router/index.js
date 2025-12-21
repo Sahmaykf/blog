@@ -6,12 +6,18 @@ import Login from '../views/Login.vue'
 import UserProfile from '../views/UserProfile.vue'
 import UserNetwork from '../views/UserNetwork.vue'
 import UserSettings from '../views/UserSettings.vue'
+import Search from '../views/Search.vue'
 
 const routes = [
   {
     path: '/',
     name: 'Home',
     component: Home
+  },
+  {
+    path: '/search',
+    name: 'Search',
+    component: Search
   },
   {
     path: '/post/:id',
